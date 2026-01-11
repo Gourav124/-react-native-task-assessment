@@ -2,7 +2,8 @@ import { View, Text, StyleSheet, TextInput, FlatList, ActivityIndicator, Image, 
 import React, { useEffect, useMemo, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import ErrorSnackBar from '../components/ErrorSnackBar'
+import PostCard from '../components/PostCard'
+import PostSkeleton from '../components/PostSkeleton'
 
 type Post = {
     userId: number
@@ -16,20 +17,39 @@ const HomeScreen = () => {
     const [data, setData] = useState<Post[]>([])
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null);
-    const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
+    const [skeletonLoader, setSkeletonLoader] = useState(false);
     const STORAGE_KEY = 'search_query';
 
     const fetchData = async () => {
         try {
             setLoading(true);
+            setSkeletonLoader(false);
             const res = await fetch('https://jsonplaceholder.typicode.com/posts');
             const json = await res.json();
             console.log(json);
             setData(json);
+            setLoading(false);
+            setSkeletonLoader(true);
+
+            setTimeout(() => {
+                setSkeletonLoader(false)
+            }, 3000);
+
         } catch (error) {
-            console.log('Error : ', error)
-            setError('Unable to fetch posts. Check your network connection');
+            Alert.alert(
+                'Unable to fetch posts.',
+                'Check your network connection!',
+                [
+                    {
+                        text: 'Retry',
+                        onPress: () => fetchData()
+                    },
+
+                    {
+                        text: 'Cancel'
+                    }
+                ]
+            );
         } finally {
             setLoading(false);
         }
@@ -52,10 +72,6 @@ const HomeScreen = () => {
         } catch (error) {
             console.log('Error : ', error)
         }
-    }
-
-    const formatText = (text: any) => {
-        return text.replace(/\s+/g, " ").trim();
     }
 
     const filterPost = useMemo(() => {
@@ -86,39 +102,38 @@ const HomeScreen = () => {
                     />
                 </View>
                 {
-                    loading
-                        ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    loading ? (
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                             <ActivityIndicator size='large' />
                         </View>
-                        :
+                    ) : skeletonLoader ? (
+                        <FlatList
+                            data={[1, 2, 3, 4, 5, 6, 7, 8, 9,10]}
+                            keyExtractor={(item) => item.toString()}
+                            showsVerticalScrollIndicator={false}
+                            renderItem={
+                                () => <PostSkeleton />
+                            }
+                        />
+                    ) : (
                         <FlatList
                             data={filterPost}
                             keyExtractor={(item => item.id.toString())}
                             showsVerticalScrollIndicator={false}
+                            contentContainerStyle = {{flexGrow:1}}
                             ListEmptyComponent={
                                 <View style={styles.emptyListContainer}>
                                     <Text style={{ fontSize: 18 }}>No posts found!</Text>
                                 </View>
                             }
                             renderItem={({ item }) => (
-                                <View style={styles.postContainer}>
-                                    <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-                                    <Text style={styles.body} numberOfLines={3}>{formatText(item.body)}</Text>
-                                </View>
+                                <PostCard
+                                    title={item.title}
+                                    body={item.body}
+                                />
                             )}
-                        />
+                        />)
                 }
-
-                <ErrorSnackBar
-                    visible={!!error}
-                    message={error || ''}
-                    onRetry={() => {
-                        if (retryAction) {
-                            setRetryAction(() => fetchData())
-                        }
-                    }}
-                    onDismiss={() => setError(null)}
-                />
             </View>
         </SafeAreaView>
     )
@@ -129,7 +144,7 @@ export default HomeScreen
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingHorizontal: 16
+        padding: 16
     },
     searchContainer: {
         flexDirection: 'row',
@@ -140,20 +155,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'gray',
     },
-    postContainer: {
-        backgroundColor: '#bdc3c7',
-        margin: 10,
-        borderRadius: 8,
-        padding: 8
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: 'semibold'
-    },
-    body: {
-        fontSize: 13,
-        fontWeight: 'semibold'
-    },
     icon: {
         width: 20,
         height: 20,
@@ -163,6 +164,7 @@ const styles = StyleSheet.create({
     emptyListContainer: {
         flex: 1,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        alignSelf: 'center'
     }
 })
